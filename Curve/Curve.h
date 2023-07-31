@@ -51,7 +51,6 @@ public:
 	tresult PLUGIN_API setIoMode(IoMode mode);
 	tresult PLUGIN_API setState(IBStream* state);
 	tresult PLUGIN_API getState(IBStream* state);
-	tresult PLUGIN_API setBusArrangements(SpeakerArrangement* inputs, int32 numIns, SpeakerArrangement* outputs, int32 numOuts);
 	tresult PLUGIN_API canProcessSampleSize(int32 symbolicSampleSize);
 	~Curve(void);
 

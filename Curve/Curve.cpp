@@ -210,14 +210,6 @@ tresult PLUGIN_API Curve::getState(IBStream* state)
 	return kResultOk;
 }
 
-tresult PLUGIN_API Curve::setBusArrangements(SpeakerArrangement* inputs, int32 numIns, SpeakerArrangement* outputs, int32 numOuts)
-{
-	// We just say "ok" to all speaker arrangements because this plug-in doesn't process any audio,
-	// but some hosts refuse to load any plug-in for which they can't find a speaker arrangement.
-	LOG("Curve::setBusArrangements called and exited.\n");
-	return kResultOk;
-}
-
 tresult PLUGIN_API Curve::setupProcessing(ProcessSetup& newSetup)
 {
 	LOG("Curve::setupProcessing called.\n");
@@ -282,11 +274,11 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 	if (data.inputParameterChanges)
 	{
 		int32 n = data.inputParameterChanges->getParameterCount();
-			for (int32 i = 0; i < n; ++i)
-			{
+		for (int32 i = 0; i < n; ++i)
+		{
 			IParamValueQueue* q = data.inputParameterChanges->getParameterData(i);
 			if (!q) continue;
-				ParamID id = q->getParameterId();
+			ParamID id = q->getParameterId();
 			if (id < num_curve_points)
 			{
 				cp_in[id].q = q;
@@ -307,7 +299,6 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 			ParamID id = q->getParameterId();
 			if ((num_curve_points <= id) && (id < num_curve_points + 2 * num_curved_params) && ((id - num_curve_points) % 2 == 1))
 				param_out[(id - num_curve_points) / 2] = q;
-			}
 		}
 	}
 
@@ -331,7 +322,7 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 		int32 t0 = -1;
 		ParamValue x0 = param_value[num_curve_points + 2 * id];
 		for (int32 i = 0; i <= n; ++i)
-	{
+		{
 			// Let (t0,x0)--(t1,x1) be the start and end points of this in-parameter curve segment.
 			int32 t1 = data.numSamples;
 			ParamValue x1 = x0;
@@ -355,7 +346,7 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 				int32 t_cp = t1;
 				const ParamValue x_nudged = std::nextafter(x, x1);
 				if (x0 != x1)
-		{
+				{
 					constexpr auto floord = static_cast<ParamValue(*)(ParamValue)>(std::floor);
 					constexpr auto ceild = static_cast<ParamValue(*)(ParamValue)>(std::ceil);
 					int32 cp = (x0 <= x1 ? ceild : floord)(x_nudged * intervals);
@@ -364,7 +355,7 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 					t_cp = std::round((ParamValue)t0 + (ParamValue)(t1 - t0) * ((x_cp - x0) / (x1 - x0)));
 					if (t_cp <= t) t_cp = t + 1;
 					if (t_cp > t1) t_cp = t1;
-		}
+				}
 
 				// Find the indexes cp0 and cp1 of the curve function points that bound interval (x, x_cp].
 				int32 cp0 = (int32)(std::floor(x_nudged * intervals) + 0.1);
@@ -386,21 +377,21 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 
 				// Compute the y-value returned by the curve function for x at time t.
 				if (cp0 == cp1)
-		{
+				{
 					y = cp_in[cp0].value_at(t);
 				}
 				else
-			{
+				{
 					const ParamValue cp0_x = (ParamValue)cp0 / intervals;
 					const ParamValue cp1_x = (ParamValue)cp1 / intervals;
 					const ParamValue cp0_y = cp_in[cp0].value_at(t);
 					const ParamValue cp1_y = cp_in[cp1].value_at(t);
 					y = cp0_y + (cp1_y - cp0_y) * ((x - cp0_x) / (cp1_x - cp0_x));
-			}
+				}
 
 				// Output point (x,y) and update stored param values.
 				if (t < data.numSamples)
-			{
+				{
 					int32 dummy;
 					if (!param_out[id] && data.outputParameterChanges)
 						param_out[id] = data.outputParameterChanges->addParameterData(num_curve_points + 1 + 2 * id, dummy);
@@ -414,25 +405,22 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 			// Progress to the next segment of in-parameter's automation curve and continue.
 			t0 = t1;
 			x0 = x1;
-			}
 		}
+	}
 
 	// Update stored curve-point values for the next call to process().
 	if (curve_changed)
-		{
+	{
 		for (int32 cp = 0; cp < num_curve_points; ++cp)
-			{
+		{
 			if (cp_in[cp].q)
-				{
+			{
 				int32 n = cp_in[cp].q->getPointCount();
 				if (n > 0)
-					{
+				{
 					int32 dummy;
 					cp_in[cp].q->getPoint(n - 1, dummy, param_value[cp]);
 				}
-
-				prev_offset = offset;
-				prev_x = x;
 			}
 		}
 	}
