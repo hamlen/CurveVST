@@ -32,6 +32,16 @@ public:
 
 	tresult PLUGIN_API setComponentState(IBStream* state) SMTG_OVERRIDE;
 
+	// Uncomment to add a GUI
+	// IPlugView * PLUGIN_API createView (const char * name);
+
+	// Uncomment to override default EditController behavior
+	// tresult PLUGIN_API setState(IBStream* state);
+	// tresult PLUGIN_API getState(IBStream* state);
+	// tresult PLUGIN_API setParamNormalized(ParamID tag, ParamValue value);
+	// tresult PLUGIN_API getParamStringByValue(ParamID tag, ParamValue valueNormalized, String128 string);
+	// tresult PLUGIN_API getParamValueByString(ParamID tag, TChar* string, ParamValue& valueNormalized);
+
 	~CurveController(void);
 };
 
