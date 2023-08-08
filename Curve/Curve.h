@@ -56,6 +56,7 @@ public:
 
 protected:
 	ParamValue param_value[num_params];
+	bool initial_values_sent = false;
 };
 
 #ifdef LOGGING

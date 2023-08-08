@@ -131,6 +131,7 @@ tresult PLUGIN_API Curve::setIoMode(IoMode mode)
 tresult PLUGIN_API Curve::setProcessing(TBool state)
 {
 	LOG("Curve::setProcessing called and exited.\n");
+	initial_values_sent = false;
 	return kResultOk;
 }
 
@@ -423,6 +424,20 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 				}
 			}
 		}
+	}
+
+	// Force-output initial values on first call to process(), to help hosts sync up.
+	if (data.outputParameterChanges && !initial_values_sent)
+	{
+		for (ParamID id = 0; id < num_curved_params; ++id)
+		{
+			int32 dummy;
+			if (!param_out[id])
+				param_out[id] = data.outputParameterChanges->addParameterData(num_curve_points + 1 + 2 * id, dummy);
+			if (param_out[id] && param_out[id]->getPointCount() <= 0)
+				param_out[id]->addPoint(0, param_value[num_curve_points + 2 * id + 1], dummy);
+		}
+		initial_values_sent = true;
 	}
 
 	return kResultOk;
