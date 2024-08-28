@@ -248,58 +248,80 @@ tresult PLUGIN_API Curve::process(ProcessData& data)
 		return kResultFalse;
 
 	// We shouldn't be asked for any audio, but process it anyway (emit silence) to tolerate uncompliant hosts.
-	for (int32 i = 0; i < data.numOutputs; ++i)
+	const bool is32bit = (data.symbolicSampleSize == kSample32);
+	const size_t buffersize = data.numSamples * (is32bit ? sizeof(Sample32) : sizeof(Sample64));
+	if ((is32bit || (data.symbolicSampleSize == kSample64)) && (buffersize > 0))
 	{
-		for (int32 j = 0; j < data.outputs[i].numChannels; ++j)
+		for (int32 i = 0; i < data.numOutputs; ++i)
 		{
-			bool is32bit = (data.symbolicSampleSize == kSample32);
-			if (is32bit || (data.symbolicSampleSize == kSample64))
+			for (int32 j = 0; j < data.outputs[i].numChannels; ++j)
 			{
-				void* channelbuffer = is32bit ? (void*)data.outputs[i].channelBuffers32[j] : (void*)data.outputs[i].channelBuffers64[j];
-				size_t datasize = is32bit ? sizeof(*data.outputs[i].channelBuffers32[j]) : sizeof(*data.outputs[i].channelBuffers64[j]);
-				if (channelbuffer)
-					memset(channelbuffer, 0, data.numSamples * datasize);
+				if (void* channelbuffer = is32bit ? (void*)data.outputs[i].channelBuffers32[j] : (void*)data.outputs[i].channelBuffers64[j])
+					memset(channelbuffer, 0, buffersize);
 			}
+			data.outputs[i].silenceFlags = (1ULL << data.outputs[i].numChannels) - 1ULL;
 		}
-		data.outputs[i].silenceFlags = (1ULL << data.outputs[i].numChannels) - 1;
 	}
 
+	// If the host wants to flush parameters without processing, do so and exit.
 	if (data.numSamples <= 0)
-		return kResultTrue;
+	{
+		if (data.inputParameterChanges)
+		{
+			const int32 numParamChanges = data.inputParameterChanges->getParameterCount();
+			for (int32 i = 0; i < numParamChanges; ++i)
+			{
+				if (IParamValueQueue* const q = data.inputParameterChanges->getParameterData(i))
+				{
+					const ParamID id = q->getParameterId();
+					const int32 numPoints = q->getPointCount();
+					if (id < num_params && numPoints > 0)
+					{
+						int32 dummy;
+						q->getPoint(numPoints - 1, dummy, param_value[id]);
+					}
+				}
+			}
+		}
+		return kResultOk;
+	}
 
 	// Organize parameter change queues into arrays.
 	StatefulParamQueue cp_in[num_curve_points] = {};
 	IParamValueQueue* param_in[num_curved_params] = {};
-	IParamValueQueue* param_out[num_curved_params] = {};
 	bool curve_changed = false;
 	if (data.inputParameterChanges)
 	{
-		int32 n = data.inputParameterChanges->getParameterCount();
-		for (int32 i = 0; i < n; ++i)
+		const int32 numParamChanges = data.inputParameterChanges->getParameterCount();
+		for (int32 i = 0; i < numParamChanges; ++i)
 		{
-			IParamValueQueue* q = data.inputParameterChanges->getParameterData(i);
-			if (!q) continue;
-			ParamID id = q->getParameterId();
-			if (id < num_curve_points)
+			if (IParamValueQueue* const q = data.inputParameterChanges->getParameterData(i))
 			{
-				cp_in[id].q = q;
-				if (q->getPointCount() > 0)
-					curve_changed = true;
+				const ParamID id = q->getParameterId();
+				if (id < num_curve_points)
+				{
+					cp_in[id].q = q;
+					if (q->getPointCount() > 0)
+						curve_changed = true;
+				}
+				else if (id < num_params && (id - num_curve_points) % 2 == 0)
+					param_in[(id - num_curve_points) / 2] = q;
 			}
-			else if (id < num_curve_points + 2 * num_curved_params && (id - num_curve_points) % 2 == 0)
-				param_in[(id - num_curve_points) / 2] = q;
 		}
 	}
+
+	IParamValueQueue* param_out[num_curved_params] = {};
 	if (data.outputParameterChanges)
 	{
-		int32 n = data.outputParameterChanges->getParameterCount();
-		for (int32 i = 0; i < n; ++i)
+		const int32 numParamChanges = data.outputParameterChanges->getParameterCount();
+		for (int32 i = 0; i < numParamChanges; ++i)
 		{
-			IParamValueQueue* q = data.outputParameterChanges->getParameterData(i);
-			if (!q) continue;
-			ParamID id = q->getParameterId();
-			if ((num_curve_points <= id) && (id < num_curve_points + 2 * num_curved_params) && ((id - num_curve_points) % 2 == 1))
-				param_out[(id - num_curve_points) / 2] = q;
+			if (IParamValueQueue* const q = data.outputParameterChanges->getParameterData(i))
+			{
+				const ParamID id = q->getParameterId();
+				if ((num_curve_points <= id) && (id < num_params) && ((id - num_curve_points) % 2 == 1))
+					param_out[(id - num_curve_points) / 2] = q;
+			}
 		}
 	}
 
